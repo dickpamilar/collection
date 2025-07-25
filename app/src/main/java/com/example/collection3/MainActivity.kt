@@ -60,9 +60,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
 @Composable
-
 fun CollectionCalculator() {
     val context = LocalContext.current
     val denominations = listOf(100.0, 50.0, 20.0, 10.0, 5.0, 2.0, 1.0, 0.5, 0.2, 0.1, 0.05)
@@ -78,33 +76,33 @@ fun CollectionCalculator() {
     val BBFC = secondCollection * 0.7
     val OLOR = secondCollection - BBFC
 
-
     var showMenu by remember { mutableStateOf(false) }
 
-    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
+    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         uri?.let { saveToUri(context, it, counts) }
     }
 
-    val loadLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+    val loadLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { loadFromUri(context, it, counts) }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Custom Top Bar
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        // Header row
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Collection Calculator", fontSize = 20.sp)
-
+            Text("Collection Calculator", fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Box {
                 IconButton(onClick = { showMenu = true }) {
                     Icon(Icons.Default.MoreVert, contentDescription = "Menu")
                 }
-
                 DropdownMenu(
                     expanded = showMenu,
                     onDismissRequest = { showMenu = false }
@@ -128,49 +126,56 @@ fun CollectionCalculator() {
             }
         }
 
-        Column(
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState())
-        ) {
-            denominations.forEachIndexed { index, denom ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Denomination inputs
+        denominations.forEachIndexed { index, denom ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "$${"%.2f".format(denom)}",
+                    modifier = Modifier.width(85.dp),
+                    fontSize = 16.sp
+                )
+                TextField(
+                    value = counts[index],
+                    onValueChange = { counts[index] = it },
+                    placeholder = { Text("0") },
+                    singleLine = true,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                ) {
-                    Text(text = denom.toString(), fontSize = 18.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    TextField(
-                        value = counts[index],
-                        onValueChange = { counts[index] = it },
-                        singleLine = true,
-                        modifier = Modifier.width(100.dp),
-                        colors = TextFieldDefaults.colors(
-                            focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                            unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                            disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
-                        )
+                        .width(100.dp)
+                        .padding(end = 8.dp),
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                        unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "= %.2f".format(totals[index]), fontSize = 18.sp)
-                }
+                )
+                Text(
+                    text = "= $%.2f".format(totals[index]),
+                    fontSize = 16.sp,
+                    modifier = Modifier.weight(1f)
+                )
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-            Text("Total Collection: %.2f".format(grandTotal), fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("First Collection: %.2f".format(grandTotal * 0.2), fontSize = 18.sp)
-            Text("Second Collection: %.2f".format(grandTotal * 0.8), fontSize = 18.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("First Collection: %.2f".format(grandTotal * 0.2), fontSize = 18.sp)
-            Text("BBFC: %.2f".format(BBFC), fontSize = 18.sp)
-            Text("OLOR: %.2f".format(OLOR), fontSize = 18.sp)
-
         }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text("Total Collection: $%.2f".format(grandTotal), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Text("First Collection : $%.2f".format(firstCollection), fontSize = 16.sp)
+        Text("Second Collection : $%.2f".format(secondCollection), fontSize = 16.sp)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text("Breakdown of Second Collection", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+        Text("BBFC : $%.2f".format(BBFC), fontSize = 16.sp)
+        Text("OLOR : $%.2f".format(OLOR), fontSize = 16.sp)
+        Spacer(modifier = Modifier.height(24.dp))
     }
 }
+
+
 
 
 fun saveToUri(context: Context, uri: Uri, counts: List<String>) {
