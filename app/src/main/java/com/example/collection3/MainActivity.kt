@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -26,6 +27,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -40,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.collection3.ui.theme.Collection3Theme
@@ -65,6 +68,7 @@ fun CollectionCalculator() {
     val context = LocalContext.current
     val denominations = listOf(100.0, 50.0, 20.0, 10.0, 5.0, 2.0, 1.0, 0.5, 0.2, 0.1, 0.05)
     val counts = remember { mutableStateListOf(*Array(denominations.size) { "" }) }
+    var attendees by remember { mutableStateOf("") } // State for attendees input
 
     val totals = denominations.mapIndexed { index, denom ->
         val count = counts[index].toDoubleOrNull() ?: 0.0
@@ -79,11 +83,11 @@ fun CollectionCalculator() {
     var showMenu by remember { mutableStateOf(false) }
 
     val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
-        uri?.let { saveToUri(context, it, counts) }
+        uri?.let { saveToUri(context, it, counts, attendees) } // Pass attendees to save function
     }
 
     val loadLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { loadFromUri(context, it, counts) }
+        uri?.let { loadFromUri(context, it, counts) { loadedAttendees -> attendees = loadedAttendees } } // Update attendees on load
     }
 
     Column(
@@ -111,7 +115,7 @@ fun CollectionCalculator() {
                         text = { Text("Save (SAF)") },
                         onClick = {
                             val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())
-                            saveLauncher.launch("collection_$timestamp.txt")
+                            saveLauncher.launch("col_$timestamp.txt")
                             showMenu = false
                         }
                     )
@@ -126,7 +130,7 @@ fun CollectionCalculator() {
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+
 
         // Denomination inputs
         denominations.forEachIndexed { index, denom ->
@@ -143,15 +147,19 @@ fun CollectionCalculator() {
                 )
                 TextField(
                     value = counts[index],
-                    onValueChange = { counts[index] = it },
+                    onValueChange = { counts[index] = it.filter { char -> char.isDigit() || char == '.' } }, // Allow digits and decimal point
                     placeholder = { Text("0") },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier
                         .width(100.dp)
                         .padding(end = 8.dp),
                     colors = TextFieldDefaults.colors(
                         focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                        unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
+                        unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                        // Setting container color explicitly might be needed depending on your theme
+                        // focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        // unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                 )
                 Text(
@@ -165,6 +173,8 @@ fun CollectionCalculator() {
         Spacer(modifier = Modifier.height(24.dp))
 
         Text("Total Collection: $%.2f".format(grandTotal), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+
+        Spacer(modifier = Modifier.height(8.dp))
         Text("First Collection : $%.2f".format(firstCollection), fontSize = 16.sp)
         Text("Second Collection : $%.2f".format(secondCollection), fontSize = 16.sp)
         Spacer(modifier = Modifier.height(8.dp))
@@ -172,13 +182,27 @@ fun CollectionCalculator() {
         Text("BBFC : $%.2f".format(BBFC), fontSize = 16.sp)
         Text("OLOR : $%.2f".format(OLOR), fontSize = 16.sp)
         Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Attendees Input
+        OutlinedTextField(
+            value = attendees,
+            onValueChange = { attendees = it.filter { char -> char.isDigit() } }, // Allow only digits
+            label = { Text("Number of Attendees") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(40.dp))
+
     }
 }
 
 
 
 
-fun saveToUri(context: Context, uri: Uri, counts: List<String>) {
+fun saveToUri(context: Context, uri: Uri, counts: List<String>, attendees: String) { // Added attendees
     val grandTotal = counts.mapIndexed { i, value ->
         (value.toDoubleOrNull() ?: 0.0) * listOf(100.0, 50.0, 20.0, 10.0, 5.0, 2.0, 1.0, 0.5, 0.2, 0.1, 0.05)[i]
     }.sum()
@@ -188,6 +212,8 @@ fun saveToUri(context: Context, uri: Uri, counts: List<String>) {
 
     val data = buildString {
         append(counts.joinToString(","))
+        append("\n")
+        append(attendees) // Save attendees
         append("\n")
         append("%.2f,%.2f,%.2f".format(grandTotal, firstCollection, secondCollection))
     }
@@ -202,15 +228,26 @@ fun saveToUri(context: Context, uri: Uri, counts: List<String>) {
     }
 }
 
-fun loadFromUri(context: Context, uri: Uri, counts: MutableList<String>) {
+fun loadFromUri(context: Context, uri: Uri, counts: MutableList<String>, onAttendeesLoaded: (String) -> Unit) { // Added callback
     try {
         val input = context.contentResolver.openInputStream(uri)?.bufferedReader()?.readLines()
-        if (input != null && input.isNotEmpty()) {
+        if (input != null && input.size >= 2) { // Ensure there are enough lines
             val values = input[0].split(",")
             for (i in counts.indices) {
                 counts[i] = values.getOrNull(i) ?: ""
             }
+            val loadedAttendees = input[1] // Load attendees from the second line
+            onAttendeesLoaded(loadedAttendees)
+
+            // Optional: Load totals if you also saved them and want to verify/use them
+            // if (input.size >= 3) {
+            //     val totalsFromFile = input[2].split(",")
+            //     // Process totalsFromFile if needed
+            // }
+
             Toast.makeText(context, "File loaded", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "Error loading: Invalid file format", Toast.LENGTH_LONG).show()
         }
     } catch (e: Exception) {
         Toast.makeText(context, "Error loading: ${e.message}", Toast.LENGTH_LONG).show()
